@@ -1,0 +1,11 @@
+{
+    "model_name_or_path": "roberta-large",
+    "task_name": "SST-2",
+    "output_dir": "output/SST-2/roberta-large",
+    "cache_dir": "cache",
+    "do_eval": true,
+    "do_predict": true,
+    "per_device_eval_batch_size": 64,
+    "seed": 42,
+    "data_dir": "data/k-shot-1k-test/SST-2-16-42"
+  }

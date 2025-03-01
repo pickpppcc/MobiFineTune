@@ -1,0 +1,6 @@
+TASK=sst-5 STEP=100 SEED=42 BS=64 LR=1e-6 EPS=1e-3 MODEL=../../models/Llama-3.2-1B bash mezo.sh
+TASK=sst-5 SEED=42 BS=64 LR=1e-4 EPS=1e-3 MODEL=../../models/Llama-3.2-1B EXTRA_TAG=lora bash mezo.sh --apply_lora --lora_r 8 --lora_alpha 16
+TASK=sst-5 SEED=42 BS=8 LR=1e-5 MODEL=../../models/Llama-3.2-1B bash finetune.sh
+
+TASK=SST-2 SEED=42 BS=8  LR=1e-6 EPS=1e-3 MODEL=../../models/ds-qwen2.5-1.5B bash mezo.sh
+TASK=RTE SEED=42 BS=8  LR=1e-6 EPS=1e-3 MODEL=../../models/ds-qwen2.5-1.5B bash mezo.sh

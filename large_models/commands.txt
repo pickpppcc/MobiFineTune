@@ -1,0 +1,34 @@
+"SST2" "RTE"	"CB"	"BoolQ"	"WSC" "WIC" "MultiRC"	"Copa"	"ReCoRD"	"SQuAD"	"DROP"
+MODEL=../../models/ds-qwen2.5-1.5B TASK=SST2 MODE=ft LR=1e-7 EPS=1e-3 bash mezo.sh
+MODEL=../../models/ds-qwen2.5-1.5B TASK=RTE MODE=ft LR=1e-7 EPS=1e-3 bash mezo.sh
+MODEL=../../models/ds-qwen2.5-1.5B TASK=CB MODE=ft LR=1e-7 EPS=1e-3 bash mezo.sh
+MODEL=../../models/ds-qwen2.5-1.5B TASK=BoolQ MODE=ft LR=1e-7 EPS=1e-3 bash mezo.sh
+
+MODEL=../../models/ds-qwen2.5-1.5B TASK=SST2 MODE=lora LR=5e-5 EPS=1e-2 bash mezo.sh
+MODEL=../../models/ds-qwen2.5-1.5B TASK=RTE MODE=lora LR=5e-5 EPS=1e-2 bash mezo.sh
+MODEL=../../models/ds-qwen2.5-1.5B TASK=CB MODE=lora LR=5e-5 EPS=1e-2 bash mezo.sh
+MODEL=../../models/ds-qwen2.5-1.5B TASK=BoolQ MODE=lora LR=5e-5 EPS=1e-2 bash mezo.sh
+
+MODEL=../../models/ds-qwen2.5-1.5B TASK=WSC MODE=ft LR=1e-7 EPS=1e-3 bash mezo.sh
+MODEL=../../models/ds-qwen2.5-1.5B TASK=WIC MODE=ft LR=1e-7 EPS=1e-3 bash mezo.sh
+MODEL=../../models/ds-qwen2.5-1.5B TASK=MultiRC MODE=ft LR=1e-7 EPS=1e-3 bash mezo.sh
+MODEL=../../models/ds-qwen2.5-1.5B TASK=Copa MODE=ft LR=1e-7 EPS=1e-3 bash mezo.sh
+MODEL=../../models/ds-qwen2.5-1.5B TASK=ReCoRD MODE=ft LR=1e-7 EPS=1e-3 bash mezo.sh
+MODEL=../../models/ds-qwen2.5-1.5B TASK=SQuAD MODE=ft LR=1e-7 EPS=1e-3 bash mezo.sh
+MODEL=../../models/ds-qwen2.5-1.5B TASK=DROP MODE=ft LR=1e-7 EPS=1e-3 bash mezo.sh
+
+
+zeroshot
+MODEL=../../models/ds-qwen2.5-1.5B  TASK=SST2 bash icl.sh --num_train 0
+MODEL=../../models/ds-qwen2.5-1.5B  TASK=RTE bash icl.sh --num_train 0
+MODEL=../../models/ds-qwen2.5-1.5B  TASK=CB bash icl.sh --num_train 0
+MODEL=../../models/ds-qwen2.5-1.5B  TASK=BoolQ bash icl.sh --num_train 0
+
+MODEL=../../models/ds-qwen2.5-1.5B TASK=SST2 MODE=ft LR=1e-5 bash finetune.sh
+MODEL=../../models/ds-qwen2.5-1.5B TASK=SST2 MODE=lora LR=1e-4 bash finetune.sh
+
+MODEL=../../models/ds-qwen2.5-1.5B TASK=RTE MODE=ft LR=1e-5 bash finetune.sh
+MODEL=../../models/ds-qwen2.5-1.5B TASK=RTE MODE=lora LR=1e-4 bash finetune.sh
+
+MODEL=../../models/ds-qwen2.5-1.5B TASK=CB MODE=ft LR=1e-5 bash finetune.sh
+MODEL=../../models/ds-qwen2.5-1.5B TASK=CB MODE=lora LR=1e-4 bash finetune.sh
