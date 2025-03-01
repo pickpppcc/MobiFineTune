@@ -1,6 +1,6 @@
 import logging
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "5,6,7"  
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"  
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -115,10 +115,13 @@ class OurArguments(TrainingArguments):
         default=True,
         metadata={"help": "Whether to use bf16 (mixed) precision instead of 32-bit"}
     )
+    
     bf16_full_eval: bool = field(
         default=True,
         metadata={"help": "Whether to use full bf16 evaluation instead of 32-bit"}
     )
+
+    num_perturbation: int =1000 #the num of perturbation per step
 
 
 def parse_args():

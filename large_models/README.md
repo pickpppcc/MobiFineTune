@@ -44,9 +44,8 @@ MODEL=facebook/opt-1.3b TASK=SST2 MODE=lora LR=1e-4 bash finetune.sh
 # Full-parameter fine-tuning using fully-sharded data parallel or FSDP (multi-GPU)
 MODEL=facebook/opt-13b TASK=SST2 MODE=ft LR=1e-5 NUM_GPU=4 bash finetune_fsdp.sh
 
-
 # MeZO (full-parameter, prefix-tuning, and LoRA)
- MODEL=../../models/ds-qwen2.5-1.5B TASK=SST2 MODE=ft LR=1e-7 EPS=1e-3 bash mezo.sh
+MODEL=../../models/ds-qwen2.5-1.5b TASK=SST2 MODE=ft LR=1e-7 EPS=1e-3 NUM_PERTURBATION=1000 bash mezo.sh
 MODEL=facebook/opt-13b TASK=SST2 MODE=ft LR=1e-7 EPS=1e-3 bash mezo.sh
 MODEL=facebook/opt-13b TASK=SST2 MODE=prefix LR=1e-3 EPS=1e-1 bash mezo.sh
 MODEL=facebook/opt-13b TASK=SST2 MODE=lora LR=5e-5 EPS=1e-2 bash mezo.sh

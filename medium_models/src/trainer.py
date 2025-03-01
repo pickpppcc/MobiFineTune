@@ -553,21 +553,8 @@ class Trainer(LinearHeadTrainer):
             # Reset the past mems state at the beginning of each epoch if necessary.
             if self.args.past_index >= 0:
                 self._past = None
-            
-            # 添加计时统计
-            time_stats = {
-                            'perturb1': 0,
-                            'forward1': 0,
-                            'perturb2': 0,
-                            'forward2': 0,
-                            'grad_compute': 0,
-                            'param_update': 0,
-                            'training_step': 0,
-                        }  
-            projected_grad_total = 0
-            total_samples = 0  
+
             for step, inputs in enumerate(epoch_iterator):
-                batch_size = inputs['input_ids'].shape[0]
                 if self.args.sync_embedding_layers:
                     assert model.module.model_type == 'opt', 'did not implement embedding layer synchronization for non-OPT models'
                     model.module.model.decoder.embed_tokens.weight = model.module.lm_head.weight
@@ -635,17 +622,15 @@ class Trainer(LinearHeadTrainer):
                     else:
                         # get number of zs to sample
                         num_zs = self.get_num_samples()
-                        logger.info(f"num_zs: {num_zs}")
                         if num_zs > 1:
                             assert self.args.zero_order_use_trainer_optim, 'cannot sample multiple zs without storing intermediate gradient. use trainer.'
-                        
+
                         for _ in range(num_zs):
                             # prepare for sampling new zs
                             random_vector = None
                             if self.args.efficient_zero_order:
                                 random_seed = np.random.randint(1000000000)
 
-                            # 第一次扰动和前向传播
                             with torch.no_grad():
                                 # first function evaluation
                                 if self.args.efficient_zero_order:
@@ -678,46 +663,38 @@ class Trainer(LinearHeadTrainer):
                             # scale grad according to number of zs sampled
                             if not self.args.scale_lr_with_samples:
                                 projected_grad = projected_grad / float(num_zs)
-                            
-                        total_samples += batch_size
-                        projected_grad_total += projected_grad/ total_samples
 
-                    projected_grad = projected_grad_total
-                    logger.info(f"projected_grad: {projected_grad}")
-                    
-                    # store gradient in parameter buffer if using trainer
-                    # o/w, the loop will exit after one round and the update will be applied directly (see below)
-                    if self.args.zero_order_use_trainer_optim:
-                        if self.args.efficient_zero_order:
-                            # print(random_seed)
-                            torch.manual_seed(random_seed)
+                            # store gradient in parameter buffer if using trainer
+                            # o/w, the loop will exit after one round and the update will be applied directly (see below)
+                            if self.args.zero_order_use_trainer_optim:
+                                if self.args.efficient_zero_order:
+                                    # print(random_seed)
+                                    torch.manual_seed(random_seed)
                                 
-                        for name, param in self.named_parameters_to_optim:
-                            # recover noise used in perturbations
+                                for name, param in self.named_parameters_to_optim:
+                                    # recover noise used in perturbations
+                                    if self.args.efficient_zero_order:
+                                        z = torch.normal(mean=0, std=1, size=param.data.size(), device=param.data.device, dtype=param.data.dtype)
+                                    else:
+                                        z = random_vector[name]
+
+                                    if self.args.zo_variant is not None and not self.args.change_grad_estimate:
+                                        cname = self.retrieve_c(name)
+                                        if cname in self.cs:
+                                            z = z * self.cs[cname]
+
+                                    if param.grad is None:
+                                        param.grad = projected_grad * z
+                                    else:
+                                        param.grad += projected_grad * z
+
+                            # reset model back to its parameters at start of step
                             if self.args.efficient_zero_order:
-                                z = torch.normal(mean=0, std=1, size=param.data.size(), device=param.data.device, dtype=param.data.dtype)
+                                model = self.efficient_perturb_parameters(model, random_seed)
+                            elif self.args.zo_variant is not None:
+                                model, random_vector = self.norm_perturb_parameters(model, random_vector)   
                             else:
-                                z = random_vector[name]
-
-                            if self.args.zo_variant is not None and not self.args.change_grad_estimate:
-                                cname = self.retrieve_c(name)
-                                if cname in self.cs:
-                                    z = z * self.cs[cname]
-
-                            if param.grad is None:
-                                param.grad = projected_grad * z
-                            else:
-                                param.grad += projected_grad * z
-
-                        # reset model back to its parameters at start of step
-                        if self.args.efficient_zero_order:
-                            model = self.efficient_perturb_parameters(model, random_seed)
-                        elif self.args.zo_variant is not None:
-                            model, random_vector = self.norm_perturb_parameters(model, random_vector)   
-                        else:
-                            model, random_vector = self.perturb_parameters(model, random_vector)
-                
-                        
+                                model, random_vector = self.perturb_parameters(model, random_vector)
 
                     # apply gradient updates
                     # if using trainer, follow trainer logic to clip grad and check if parameters should be updated
@@ -760,7 +737,7 @@ class Trainer(LinearHeadTrainer):
                                             norm += torch.sum(p.grad ** 2)
                                     norm = torch.sqrt(norm)
                                     logs["grad_norm"] = norm.item()
-                                    logs["grad_norm"] = norm.item()
+                            
                                 logs["learning_rate"] = (
                                     scheduler.get_last_lr()[0]
                                     if version.parse(torch.__version__) >= version.parse("1.4")
@@ -819,11 +796,8 @@ class Trainer(LinearHeadTrainer):
 
                 # standard, non-ZO optimization
                 else:
-                    # 训练步骤
                     tr_loss += self.training_step(model, inputs)
-                    
-                    
-                    # 梯度裁剪
+
                     if (step + 1) % self.args.gradient_accumulation_steps == 0 or (
                         # last step in epoch but step is always smaller than gradient_accumulation_steps
                         len(epoch_iterator) <= self.args.gradient_accumulation_steps
@@ -871,25 +845,6 @@ class Trainer(LinearHeadTrainer):
 
                             self.log(logs)
                             logger.info(str(logs))
-                    
-                    gradient_stats = defaultdict(list)
-
-                    for name, param in self.named_parameters_to_optim:
-                        if param.grad is not None:
-                            logger.info(f"Gradient of {name}:")
-                            logger.info(f"Mean: {param.grad.mean()}")
-                            logger.info(f"Std: {param.grad.std()}")
-                            logger.info(f"Max: {param.grad.max()}")
-                            logger.info(f"Min: {param.grad.min()}")
-                            gradient_stats['step'].append(self.state.global_step)
-                            gradient_stats['parameter'].append(name)
-                            gradient_stats['mean'].append(param.grad.mean().item())
-                            gradient_stats['std'].append(param.grad.std().item())
-                            gradient_stats['max'].append(param.grad.max().item())
-                            gradient_stats['min'].append(param.grad.min().item())
-                            df = pd.DataFrame(gradient_stats)
-                            df.to_csv(f'gradient_stats_ft.csv', index=False)
-                   
 
                 if self.args.max_steps > 0 and self.state.global_step > self.args.max_steps or (self.args.max_zo_forward_steps > 0 and self.state.zo_forward_step > self.args.max_zo_forward_steps):
                     epoch_iterator.close()
@@ -898,7 +853,6 @@ class Trainer(LinearHeadTrainer):
                 if self.args.evaluate_during_training and self.state.global_step % self.args.eval_steps == 0:
                     output = self.evaluate()
                     metrics = output.metrics
-                    print(metrics)
                     self.step_values.append(self.state.global_step)
                     self.loss_values.append(metrics['eval_loss'])
                     self.acc_values.append(metrics['eval_acc'])
@@ -910,8 +864,6 @@ class Trainer(LinearHeadTrainer):
 
                         # Now we save this to (CPU) memory instead of disk <-- much faster
                         self.best_model_ckpt = {k: v.detach().cpu() for k, v in model.state_dict().items()}
-            
-
 
             if self.args.max_steps > 0 and self.state.global_step > self.args.max_steps or (self.args.max_zo_forward_steps > 0 and self.state.zo_forward_step > self.args.max_zo_forward_steps):
                 # train_iterator.close()

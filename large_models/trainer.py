@@ -784,6 +784,7 @@ class OurTrainer(Trainer):
         
         for name, param in self.named_parameters_to_optim:
             z = torch.normal(mean=0, std=1, size=param.data.size(), device=param.data.device, dtype=param.data.dtype)
+            print(f"z: {z}")
             param.data = param.data + scaling_factor * z * self.args.zo_eps
 
 
@@ -844,18 +845,27 @@ class OurTrainer(Trainer):
         # Sample the random seed for sampling z
         self.zo_random_seed = np.random.randint(1000000000)
 
-        # First function evaluation
-        self.zo_perturb_parameters(scaling_factor=1)
-        loss1 = self.zo_forward(model, inputs)
-        logger.info(f"loss1: {loss1}")
+        num_perturbation=self.args.num_perturbation
+        project_grad_total=0
+        for _ in range(num_perturbation):
+            # First function evaluation
+            self.zo_perturb_parameters(scaling_factor=1)
+            loss1 = self.zo_forward(model, inputs)
+           
 
-        # Second function evaluation
-        self.zo_perturb_parameters(scaling_factor=-2)
-        loss2 = self.zo_forward(model, inputs)
-        print("loss2:", loss2)
-        logger.info(f"loss2: {loss2}")
+            # Second function evaluation
+            self.zo_perturb_parameters(scaling_factor=-2)
+            loss2 = self.zo_forward(model, inputs)
+            
+            
+            projected_grad = ((loss1 - loss2) / (2 * self.args.zo_eps)).item()
+            logger.info(" Projected Gradient : %s", projected_grad)
+            project_grad_total+= projected_grad
 
-        self.projected_grad = ((loss1 - loss2) / (2 * self.args.zo_eps)).item()
+        self.projected_grad = project_grad_total/num_perturbation
+        logger.info("Num Perturbations: %s",num_perturbation)
+        logger.info("Avenrage Projected Gradient : %s", projected_grad)
+
         # zo_clip_grad = 5
         # self.projected_grad = max(min(self.projected_grad, zo_clip_grad), -zo_clip_grad)
         print("projected_grad:", self.projected_grad)

@@ -3,8 +3,8 @@
 import dataclasses
 import logging
 import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "6, 7"  
 os.environ["WANDB_MODE"] = "offline"
-os.environ["CUDA_VISIBLE_DEVICES"] = "7"
 import sys
 from dataclasses import dataclass, field
 from typing import Callable, Dict, Optional, Union, List
@@ -108,10 +108,10 @@ class DynamicDataTrainingArguments(DataTrainingArguments):
     """
     Arguments for dynamic training.
     """
-    num_k: Optional[int] = field(
-        default=16,
-        metadata={"help": "Number of training instances per class"}
-    )
+    # num_k: Optional[int] = field(
+    #     default=16,
+    #     metadata={"help": "Number of training instances per class"}
+    # )
 
     num_sample: Optional[int] = field(
         default=16,
@@ -620,15 +620,13 @@ class MyDataCollatorWithPadding:
             batch["sfc_input_ids"] = sfc_batch["input_ids"]
             batch["sfc_attention_mask"] = sfc_batch["attention_mask"]
             batch["sfc_mask_pos"] = sfc_batch["mask_pos"]
-        
-        
         return batch
 
 
 def main():
     # 解析命令行参数
+    precision = "fp32"  # 默认值
     print(sys.argv)
-    precision = "fp32"
     if '--precision' in sys.argv:
         precision_index = sys.argv.index('--precision')
         if precision_index + 1 < len(sys.argv):
@@ -907,7 +905,6 @@ def main():
         cache_dir=model_args.cache_dir,
         trust_remote_code=True
     )
-
     if "opt" in model_args.model_name_or_path:
         # Set SEP token
         tokenizer.sep_token_id = tokenizer.eos_token_id
@@ -949,9 +946,6 @@ def main():
     for name, param in model.named_parameters():
         print(f"Parameter: {name}, dtype: {param.dtype}")
 
-    # 打印模型参数的数据类型
-    for name, param in model.named_parameters():
-        print(f"Parameter: {name}, dtype: {param.dtype}")
 
     if training_args.tie_emb:
         logger.warn("Tie embeddings. Only work for RoBERTa (in our code by default they are not tied)")
@@ -1214,7 +1208,9 @@ def main():
     print(model_name)
     # 保存准确率到文件
     if accuracy is not None:
-        with open(os.path.join(training_args.output_dir, "accuracy.txt"), "w") as f:
+        output_dir = "result/{}/{}".format(data_args.tag, model_name)
+        os.makedirs(output_dir, exist_ok=True)
+        with open(os.path.join(output_dir, "accuracy.txt"), "w") as f:
             f.write("Accuracy: {:.2f}\n".format(accuracy * 100))
 
     logger.info(f"Data arguments: {data_args}")
